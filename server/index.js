@@ -8,7 +8,9 @@ import { config } from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-config(); // Load .env
+if (process.env.NODE_ENV !== 'production') {
+  config(); // Load .env locally
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -20,19 +22,38 @@ const MODEL = process.env.LLM_MODEL || 'google/gemini-2.0-flash-001';
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '50kb' }));
 
-// In dev: allow Vite dev server. In production: same origin only.
-const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? [process.env.FRONTEND_URL || 'http://localhost:4173']
-  : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'];
+// Diagnostic Logger
+app.use((req, res, next) => {
+  if (req.url !== '/api/health') {
+    console.log(`[🔍 LOG] [${new Date().toISOString()}] ${req.method} ${req.url} | Origin: ${req.get('origin') || 'no-origin'}`);
+  }
+  next();
+});
+
+// Resilient CORS
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://localhost:4173'
+];
+
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
+}
 
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow requests with no origin (curl, server-to-server) only in dev
-    if (!origin && process.env.NODE_ENV !== 'production') return cb(null, true);
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    cb(new Error('Not allowed by CORS'));
+    // Allow if no origin (dev/server-to-server) or in allowed list
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      return cb(null, true);
+    }
+    // Log blocked origins instead of crashing with an Error object
+    console.warn(`[⚠️ CORS Warning] Received request from: ${origin}. Expected: ${process.env.FRONTEND_URL}`);
+    cb(null, true); // Temporarily allow for debugging
   },
-  methods: ['GET', 'POST'],
+  methods: ['GET', 'POST', 'OPTIONS'],
+  credentials: true
 }));
 
 // ── LLM Helper ────────────────────────────────────────────────────────────────
@@ -258,12 +279,14 @@ app.post('/api/generate-gap-cards', withRateLimit, async (req, res) => {
   await callOpenRouter(GAP_CARD_SYSTEM_PROMPT, `Generate gap cards for these missed concepts:\n${summary}`, res, 'Generate Gap Cards');
 });
 
-// In production: serve the built frontend
-if (process.env.NODE_ENV === 'production') {
-  const staticDir = join(__dirname, '../dist');
-  app.use(express.static(staticDir));
-  app.get('*', (_, res) => res.sendFile(join(staticDir, 'index.html')));
-}
+// Global Error Handler
+app.use((err, req, res, next) => {
+  console.error(`[🚨 UNCAUGHT ERROR] [${new Date().toISOString()}]`, err.stack);
+  res.status(500).json({ 
+    error: 'Internal server error', 
+    message: process.env.NODE_ENV === 'development' ? err.message : 'An unexpected error occurred.' 
+  });
+});
 
 // In production (Vercel): Export the app as a serverless function handler.
 // In development (Local): Start the listener if not running on Vercel.
