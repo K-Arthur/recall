@@ -1,4 +1,30 @@
-server/.env
-.env
-dist/
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production
+dist/
+dist-ssr/
+*.local
+
+# Environment Variables (IMPORTANT: NEVER COMMIT SECRETS)
+.env
+.env.*
+!.env.example
+server/.env
+server/.env.*
+!server/.env.example
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

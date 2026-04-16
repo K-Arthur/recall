@@ -265,8 +265,14 @@ if (process.env.NODE_ENV === 'production') {
   app.get('*', (_, res) => res.sendFile(join(staticDir, 'index.html')));
 }
 
-app.listen(PORT, () => {
-  console.log(`\n🧠 Recall API server running on http://localhost:${PORT}`);
-  console.log(`   Model: ${MODEL}`);
-  console.log(`   Env:   ${process.env.NODE_ENV || 'development'}\n`);
-});
+// In production (Vercel): Export the app as a serverless function handler.
+// In development (Local): Start the listener if not running on Vercel.
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`\n🧠 Recall API server running on http://localhost:${PORT}`);
+    console.log(`   Model: ${MODEL}`);
+    console.log(`   Env:   ${process.env.NODE_ENV || 'development'}\n`);
+  });
+}
+
+export default app;

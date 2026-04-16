@@ -11,12 +11,14 @@ Browser (React/Vite)
     │
     │  /api/*  (HTTP)
     ▼
-Express Server  ──►  OpenRouter API  ──►  LLM (Gemini Flash)
+Vercel / Express  ──►  OpenRouter API  ──►  LLM (Gemini Flash)
     │
-  server/.env    ← API key lives HERE ONLY, never on the client
+  Secrets  ← API key lives in Vercel Dashboard or server/.env
 ```
 
 **The OpenRouter API key is stored exclusively on the server.** It is never sent to or accessible by the browser.
+
+---
 
 ## Getting Started
 
@@ -26,19 +28,25 @@ Express Server  ──►  OpenRouter API  ──►  LLM (Gemini Flash)
 
 ### 1. Clone & install
 ```bash
-git clone <repo>
+git clone <repo-url>
 cd recall
 npm install
 ```
 
-### 2. Configure the server
-```bash
-# Copy the template:
-cp server/.env server/.env.local   # (or just edit server/.env directly)
+### 2. Configure Environment Variables
 
-# Set your API key:
-OPENROUTER_API_KEY=sk-or-v1-your-key-here
+This project uses environment variables for both the frontend and backend.
+
+- **Root (`.env`)**: Configure `VITE_API_BASE_URL` (usually `/api`).
+- **Server (`server/.env`)**: Configure your `OPENROUTER_API_KEY` and model settings.
+
+```bash
+# Copy templates to create your local env files
+cp .env.example .env
+cp server/.env.example server/.env
 ```
+
+*Note: The `.env` files are ignored by git to keep your secrets safe.*
 
 ### 3. Run in development
 ```bash
@@ -46,7 +54,7 @@ npm run dev
 # Starts Express API on :3001 and Vite on :5173 concurrently
 ```
 
-### 4. Build & run in production
+### 4. Build & Production Run (Local)
 ```bash
 npm run build        # Builds frontend into /dist
 npm start            # Express serves both API + static frontend
@@ -54,34 +62,38 @@ npm start            # Express serves both API + static frontend
 
 ---
 
+## Deployment to Vercel
+
+This project is optimized for deployment on [Vercel](https://vercel.com).
+
+1. **Push your code** to a GitHub/GitLab/Bitbucket repository.
+2. **Import Project** into Vercel.
+3. **Configure Environment Variables** in the Vercel Dashboard:
+   - `OPENROUTER_API_KEY`: Your secret key.
+   - `LLM_MODEL`: `google/gemini-2.0-flash-001` (recommended).
+   - `FRONTEND_URL`: Your Vercel deployment URL (e.g., `https://your-app.vercel.app`).
+   - `NODE_ENV`: `production`.
+4. **Deploy**: Vercel will automatically use the `vercel.json` configuration to set up the frontend and the serverless backend.
+
+---
+
 ## Project Structure
 
 ```
 recall/
-├── src/                    # React frontend
-│   ├── services/llm.js     # Calls /api/* (NO secrets here)
-│   ├── hooks/useLibrary.js # localStorage persistence
-│   └── App.jsx             # All UI views
+├── src/                    # React frontend (Vite)
 ├── server/
-│   ├── index.js            # Express API proxy
-│   └── .env                # 🔒 API key — never commit this
+│   ├── index.js            # Express API (Serverless Handler)
+│   └── .env.example        # Template for backend secrets
+├── vercel.json             # Vercel routing & build config
+├── .env.example            # Template for frontend config
 ├── vite.config.js          # Dev proxy: /api → :3001
 └── package.json
 ```
 
-## Environment Variables (server/.env)
+## Security Profiles
 
-| Variable | Description |
-|---|---|
-| `OPENROUTER_API_KEY` | **Required.** Your OpenRouter API key |
-| `LLM_MODEL` | Model to use (default: `google/gemini-2.0-flash-001`) |
-| `PORT` | Server port (default: `3001`) |
-| `FRONTEND_URL` | Your production domain (for CORS) |
-| `NODE_ENV` | Set to `production` in prod |
-
-## Security Notes
-
-- API key is a **server-only** environment variable — zero client exposure
-- Basic in-memory rate limiting (10 req/min per IP) — swap for Redis in production
-- Input validation on all API endpoints (type, length, structure)
-- CORS restricted to known origins in production
+- **Zero Client Exposure**: API keys are restricted to the server-side environment.
+- **Vercel Serverless**: The Express app is exported as a handler for Vercel's serverless runtime.
+- **Robust `.gitignore`**: Pre-configured to prevent accidental leaks of local development configurations and secrets.
+- **Rate Limiting**: Built-in simple rate limiting to prevent API abuse.
