@@ -12,7 +12,20 @@ async function post(endpoint, body) {
     body: JSON.stringify(body),
   });
 
-  const data = await res.json();
+  // Read as text first to avoid "Unexpected end of JSON input" on empty responses
+  const text = await res.text();
+
+  if (!text) {
+    throw new Error(`Server returned an empty response (${res.status}). Please try again.`);
+  }
+
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    console.error('Non-JSON response from server:', text.slice(0, 200));
+    throw new Error(`Server returned an unexpected response. Status: ${res.status}`);
+  }
 
   if (!res.ok) {
     throw new Error(data?.error || `Request failed (${res.status})`);
